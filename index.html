@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>RIZAL CES SBFP - Distribution Monitoring System</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/html5-qrcode"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+</head>
+<body class="bg-slate-100 min-h-screen text-slate-800 pb-12">
+  <!-- Header -->
+  <header class="bg-blue-900 text-white p-4 shadow-md sticky top-0 z-50">
+    <div class="max-w-4xl mx-auto flex justify-between items-center">
+      <div>
+        <h1 class="font-bold text-lg leading-tight">RIZAL CES - SBFP</h1>
+        <p class="text-xs text-blue-200">Goods Distribution & Monitoring</p>
+      </div>
+      <div id="connectionBadge" class="text-xs bg-green-600 px-2 py-1 rounded-full font-semibold">Ready (Mobile)</div>
+    </div>
+  </header>
+
+  <main class="max-w-4xl mx-auto p-4 space-y-6">
+    <!-- Action Tabs -->
+    <div class="grid grid-cols-3 gap-2 bg-white p-1 rounded-xl shadow-sm border border-slate-200 text-center font-medium text-sm">
+      <button onclick="switchTab('scan')" id="tab-scan" class="py-2 rounded-lg bg-blue-900 text-white">Scan QR</button>
+      <button onclick="switchTab('roster')" id="tab-roster" class="py-2 rounded-lg text-slate-600 hover:bg-slate-100">Learners</button>
+      <button onclick="switchTab('logs')" id="tab-logs" class="py-2 rounded-lg text-slate-600 hover:bg-slate-100">Logs</button>
+    </div>
+
+    <!-- TAB 1: SCANNER -->
+    <section id="sec-scan" class="space-y-4">
+      <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+        <h2 class="font-bold text-slate-700 mb-2 text-center">Camera QR Scanner</h2>
+        <div id="reader" class="overflow-hidden rounded-lg border border-dashed border-slate-300"></div>
+        <p class="text-xs text-center text-slate-500 mt-2">Point phone camera at student's QR Pass</p>
+      </div>
+
+      <!-- Scanned Result Card -->
+      <div id="resultCard" class="hidden bg-white p-4 rounded-xl shadow-md border-2 border-blue-500 space-y-3">
+        <div class="flex justify-between items-start border-b pb-2">
+          <div>
+            <h3 id="resName" class="font-bold text-lg text-blue-950">Student Name</h3>
+            <p id="resLrn" class="text-xs text-slate-500">LRN: 123456789012</p>
+            <p id="resSection" class="text-xs font-semibold text-blue-700">Grade 1 - Sampaguita</p>
+          </div>
+          <span id="resStatus" class="text-xs font-bold px-2 py-1 rounded bg-yellow-100 text-yellow-800">Pending</span>
+        </div>
+        
+        <div>
+          <label class="block text-xs font-medium text-slate-600 mb-1">Ration Type Distributed:</label>
+          <select id="rationSelect" class="w-full p-2 border border-slate-300 rounded-lg text-sm bg-slate-50">
+            <option value="Nutriban & Fresh Milk">Nutriban & Fresh Milk</option>
+            <option value="Nutri-Pack Meal">Nutri-Pack Meal</option>
+            <option value="Fortified Rice Pass">Fortified Rice Pass</option>
+          </select>
+        </div>
+
+        <button onclick="recordDistribution()" class="w-full bg-green-600 active:bg-green-700 text-white font-bold py-3 rounded-lg shadow-sm">
+          Confirm & Save Distribution
+        </button>
+      </div>
+    </section>
+
+    <!-- TAB 2: BENEFICIARIES / LEARNERS ROSTER -->
+    <section id="sec-roster" class="hidden space-y-4">
+      <!-- Bulk CSV Upload Box -->
+      <div class="bg-blue-50 border border-blue-200 p-4 rounded-xl space-y-3">
+        <h3 class="font-bold text-blue-900 text-sm">Bulk Upload Beneficiaries (CSV)</h3>
+        <p class="text-xs text-slate-600">Upload a CSV file formatted as: <code class="bg-blue-100 px-1 py-0.5 rounded">LRN, FullName, Grade, Section</code></p>
+        <input type="file" id="csvFileInput" accept=".csv" class="block w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-blue-900 file:text-white" />
+        <button onclick="handleBulkUpload()" class="w-full bg-blue-900 text-white text-xs font-bold py-2 rounded-lg">Import CSV Batch</button>
+      </div>
+
+      <!-- Add Single Student Form -->
+      <details class="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+        <summary class="font-bold text-slate-700 cursor-pointer text-sm">+ Add Single Student</summary>
+        <form id="addForm" onsubmit="addSingleStudent(event)" class="mt-3 space-y-3">
+          <input type="text" id="addLrn" placeholder="12-Digit LRN" required class="w-full p-2 border rounded text-sm" />
+          <input type="text" id="addName" placeholder="Full Name (Last, First)" required class="w-full p-2 border rounded text-sm" />
+          <div class="grid grid-cols-2 gap-2">
+            <input type="text" id="addGrade" placeholder="Grade Level" required class="p-2 border rounded text-sm" />
+            <input type="text" id="addSection" placeholder="Section" required class="p-2 border rounded text-sm" />
+          </div>
+          <button type="submit" class="w-full bg-slate-800 text-white font-bold py-2 rounded text-sm">Save Student</button>
+        </form>
+      </details>
+
+      <!-- Student List -->
+      <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 space-y-3">
+        <h3 class="font-bold text-slate-700 text-sm">Registered Beneficiaries</h3>
+        <div id="rosterList" class="space-y-2 max-h-96 overflow-y-auto"></div>
+      </div>
+    </section>
+
+    <!-- TAB 3: LOGS & EXPORT -->
+    <section id="sec-logs" class="hidden space-y-4">
+      <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 space-y-3">
+        <div class="flex justify-between items-center">
+          <h3 class="font-bold text-slate-700 text-sm">Distribution Records</h3>
+          <button onclick="exportCSV()" class="bg-green-700 text-white text-xs px-3 py-1.5 rounded font-bold">Export Excel/CSV</button>
+        </div>
+        <div id="logsList" class="space-y-2 max-h-96 overflow-y-auto text-xs"></div>
+      </div>
+    </section>
+  </main>
+
+  <!-- QR Code Display Modal -->
+  <div id="qrModal" class="hidden fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl p-6 max-w-xs w-full text-center space-y-4">
+      <h3 id="modalName" class="font-bold text-slate-800">Student Name</h3>
+      <div id="qrcode" class="flex justify-center p-2 border rounded"></div>
+      <p id="modalLrn" class="text-xs text-slate-500"></p>
+      <button onclick="closeModal()" class="w-full bg-slate-800 text-white py-2 rounded-lg font-bold text-sm">Close</button>
+    </div>
+  </div>
+
+  <script>
+    // System Data State
+    let students = JSON.parse(localStorage.getItem('sbfp_students')) || [
+      { lrn: '123456789001', name: 'Dela Cruz, Juan', grade: 'Grade 1', section: 'Sampaguita' },
+      { lrn: '123456789002', name: 'Santos, Maria', grade: 'Grade 2', section: 'Rizal' }
+    ];
+    let logs = JSON.parse(localStorage.getItem('sbfp_logs')) || [];
+    let currentScannedStudent = null;
+    let html5QrcodeScanner = null;
+
+    function saveState() {
+      localStorage.setItem('sbfp_students', JSON.stringify(students));
+      localStorage.setItem('sbfp_logs', JSON.stringify(logs));
+      renderRoster();
+      renderLogs();
+    }
+
+    // UI Tab Navigation
+    function switchTab(tab) {
+      ['scan', 'roster', 'logs'].forEach(t => {
+        document.getElementById(`sec-${t}`).classList.add('hidden');
+        document.getElementById(`tab-${t}`).className = 'py-2 rounded-lg text-slate-600 hover:bg-slate-100';
+      });
+      document.getElementById(`sec-${tab}`).classList.remove('hidden');
+      document.getElementById(`tab-${tab}`).className = 'py-2 rounded-lg bg-blue-900 text-white';
+      
+      if(tab === 'scan' && !html5QrcodeScanner) {
+        initScanner();
+      }
+    }
+
+    // Scanner Setup
+    function initScanner() {
+      html5QrcodeScanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: { width: 200, height: 200 } });
+      html5QrcodeScanner.render(onScanSuccess);
+    }
+
+    function onScanSuccess(decodedText) {
+      let matched = students.find(s => s.lrn === decodedText.trim());
+      if(matched) {
+        currentScannedStudent = matched;
+        document.getElementById('resName').innerText = matched.name;
+        document.getElementById('resLrn').innerText = `LRN: ${matched.lrn}`;
+        document.getElementById('resSection').innerText = `${matched.grade} - ${matched.section}`;
+        document.getElementById('resultCard').classList.remove('hidden');
+      } else {
+        alert("LRN Not Found in SBFP Roster: " + decodedText);
+      }
+    }
+
+    // Record Distribution
+    function recordDistribution() {
+      if(!currentScannedStudent) return;
+      const ration = document.getElementById('rationSelect').value;
+      const record = {
+        lrn: currentScannedStudent.lrn,
+        name: currentScannedStudent.name,
+        grade: currentScannedStudent.grade,
+        ration: ration,
+        timestamp: new Date().toLocaleString()
+      };
+      logs.unshift(record);
+      saveState();
+      alert(`Success! Goods released to ${currentScannedStudent.name}`);
+      document.getElementById('resultCard').classList.add('hidden');
+    }
+
+    // Roster Editing & Deleting
+    function renderRoster() {
+      const container = document.getElementById('rosterList');
+      container.innerHTML = students.map((s, idx) => `
+        <div class="flex justify-between items-center p-2.5 bg-slate-50 border rounded-lg text-xs">
+          <div>
+            <div class="font-bold text-slate-800">${s.name}</div>
+            <div class="text-slate-500">LRN: ${s.lrn} | ${s.grade} - ${s.section}</div>
+          </div>
+          <div class="flex space-x-1">
+            <button onclick="showQR('${s.lrn}', '${s.name}')" class="bg-blue-600 text-white px-2 py-1 rounded">QR</button>
+            <button onclick="editStudent(${idx})" class="bg-amber-600 text-white px-2 py-1 rounded">Edit</button>
+            <button onclick="deleteStudent(${idx})" class="bg-red-600 text-white px-2 py-1 rounded">Del</button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function addSingleStudent(e) {
+      e.preventDefault();
+      students.push({
+        lrn: document.getElementById('addLrn').value.trim(),
+        name: document.getElementById('addName').value.trim(),
+        grade: document.getElementById('addGrade').value.trim(),
+        section: document.getElementById('addSection').value.trim()
+      });
+      saveState();
+      document.getElementById('addForm').reset();
+    }
+
+    function editStudent(idx) {
+      const s = students[idx];
+      const newName = prompt("Edit Name:", s.name);
+      const newGrade = prompt("Edit Grade:", s.grade);
+      const newSec = prompt("Edit Section:", s.section);
+      if(newName && newGrade && newSec) {
+        students[idx] = { ...s, name: newName, grade: newGrade, section: newSec };
+        saveState();
+      }
+    }
+
+    function deleteStudent(idx) {
+      if(confirm(`Delete ${students[idx].name} from roster?`)) {
+        students.splice(idx, 1);
+        saveState();
+      }
+    }
+
+    // Bulk CSV Handling
+    function handleBulkUpload() {
+      const fileInput = document.getElementById('csvFileInput');
+      if (!fileInput.files.length) return alert('Please select a CSV file first.');
+
+      const file = fileInput.files[0];
+      const reader = new FileReader();
+
+      reader.onload = function (e) {
+        const lines = e.target.result.split('\n');
+        let count = 0;
+        lines.forEach(line => {
+          const parts = line.split(',');
+          if (parts.length >= 4) {
+            const lrn = parts[0].trim();
+            const name = parts[1].trim();
+            const grade = parts[2].trim();
+            const section = parts[3].trim();
+
+            if (lrn && name && !students.some(s => s.lrn === lrn)) {
+              students.push({ lrn, name, grade, section });
+              count++;
+            }
+          }
+        });
+        saveState();
+        alert(`Successfully imported ${count} new beneficiaries!`);
+      };
+      reader.readAsText(file);
+    }
+
+    // Logs & CSV Export
+    function renderLogs() {
+      const container = document.getElementById('logsList');
+      container.innerHTML = logs.map(l => `
+        <div class="p-2 border-b flex justify-between bg-white rounded">
+          <div>
+            <span class="font-bold">${l.name}</span> (${l.ration})
+            <div class="text-slate-400 text-[10px]">${l.timestamp}</div>
+          </div>
+          <span class="text-green-700 font-bold">Issued</span>
+        </div>
+      `).join('');
+    }
+
+    function exportCSV() {
+      let csv = "Timestamp,LRN,Name,Grade,Ration\n";
+      logs.forEach(l => { csv += `"${l.timestamp}","${l.lrn}","${l.name}","${l.grade}","${l.ration}"\n`; });
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.setAttribute('href', url);
+      a.setAttribute('download', `SBFP_Distribution_Report.csv`);
+      a.click();
+    }
+
+    // QR Modal logic
+    function showQR(lrn, name) {
+      document.getElementById('modalName').innerText = name;
+      document.getElementById('modalLrn').innerText = `LRN: ${lrn}`;
+      document.getElementById('qrcode').innerHTML = "";
+      new QRCode(document.getElementById("qrcode"), { text: lrn, width: 150, height: 150 });
+      document.getElementById('qrModal').classList.remove('hidden');
+    }
+
+    function closeModal() {
+      document.getElementById('qrModal').classList.add('hidden');
+    }
+
+    // Initial Startup
+    saveState();
+    window.onload = () => initScanner();
+  </script>
+</body>
+</html>
